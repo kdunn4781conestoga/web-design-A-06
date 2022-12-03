@@ -57,7 +57,7 @@ namespace myOwnWebServer
             }
             else
             {
-                Console.WriteLine("Failed to start web server, already listening");
+                Logger.Log($"Failed to start web server, already listening", "Server Error");
             }
         }
 
@@ -69,6 +69,8 @@ namespace myOwnWebServer
             if (Listening && server != null)
             {
                 server.Stop();
+
+                Logger.Log($"Stopping server at {Address}:{Port} with root folder located at {Root}", "Server Stopped");
 
                 Listening = false;
             }
@@ -86,11 +88,15 @@ namespace myOwnWebServer
 
                 server.Start();
 
+                Logger.Log($"Server running at {Address}:{Port} with root folder located at {Root}", "Server Started");
+
                 // Waits for clients to connect
-                while (true)
+                while (Listening)
                 {
                     try
                     {
+                        Logger.Log("Waiting for clients...");
+
                         TcpClient client = server.AcceptTcpClient();
 
                         NetworkStream stream = client.GetStream();
@@ -158,77 +164,92 @@ namespace myOwnWebServer
             string responseHeader = null;
             byte[] content = null;
 
-            string methodLine = request.Substring(0, request.IndexOf("\n"));
-            string[] methodSplit = methodLine.Split(' ');
-
-            // Only GET method calls are valid
-            if (methodSplit[0] == "GET")
+            if (!string.IsNullOrEmpty(request.Trim()))
             {
-                string path = methodSplit[1];
 
-                string fullPath = Root + path;
+                string methodLine = request.Substring(0, request.IndexOf("\n"));
+                string[] methodSplit = methodLine.Split(' ');
 
-                // Checks if the path exists
-                if (File.Exists(fullPath))
+                Logger.Log($"Request received with HTTP Verb '{methodSplit[0]}' and resource '{methodSplit[1]}'", "Request");
+
+                // Only GET method calls are valid
+                if (methodSplit[0] == "GET")
                 {
-                    // Determine the mime type for the path
-                    string mimeType = null;
-                    string extension = Path.GetExtension(fullPath);
-                    switch (extension)
-                    {
-                        case ".txt":
-                            mimeType = "text/plain";
-                            break;
-                        case ".html":
-                            mimeType = "text/html";
-                            break;
-                        case ".jpeg":
-                        case ".jpg":
-                            mimeType = "image/jpeg";
-                            break;
-                        case ".gif":
-                            mimeType = "image/gif";
-                            break;
-                    }
+                    string path = methodSplit[1];
 
-                    if (mimeType != null) // If mime type is supported
-                    {
-                        content = File.ReadAllBytes(fullPath);
+                    string fullPath = Root + path;
 
-                        responseHeader = $"HTTP/2 200 OK\r\n" +
-                                                $"HOST: localhost\r\n" +
-                                                $"Date: {DateTime.Now}\r\n" +
-                                                $"Content-Type: {mimeType}\r\n" +
-                                                $"Content-Length: {content.Length}\r\n\r\n";
-                    }
-                    else // If mime type isn't supported
+                    // Checks if the path exists
+                    if (File.Exists(fullPath))
                     {
-                        responseHeader = "HTTP/2 415 Unsupported Media Type\r\n";
+                        // Determine the mime type for the path
+                        string mimeType = null;
+                        string extension = Path.GetExtension(fullPath);
+                        switch (extension)
+                        {
+                            case ".txt":
+                                mimeType = "text/plain";
+                                break;
+                            case ".html":
+                                mimeType = "text/html";
+                                break;
+                            case ".jpeg":
+                            case ".jpg":
+                                mimeType = "image/jpeg";
+                                break;
+                            case ".gif":
+                                mimeType = "image/gif";
+                                break;
+                        }
+
+                        if (mimeType != null) // If mime type is supported
+                        {
+                            content = File.ReadAllBytes(fullPath);
+
+                            responseHeader = $"HTTP/2 200 OK\r\n" +
+                                                    $"Server: Assignment 6 Web Server\r\n" +
+                                                    $"Date: {DateTime.Now}\r\n" +
+                                                    $"Content-Type: {mimeType}\r\n" +
+                                                    $"Content-Length: {content.Length}\r\n\r\n";
+                        }
+                        else // If mime type isn't supported
+                        {
+                            responseHeader = "HTTP/2 415 Unsupported Media Type\r\n";
+                        }
+                    }
+                    else // If the path doesn't exist
+                    {
+                        responseHeader = "HTTP/2 404 Not Found\r\n";
                     }
                 }
-                else // If the path doesn't exist
+                else // If user tries to use anything but GET
                 {
-                    responseHeader = "HTTP/2 404 Not Found\r\n";
+                    responseHeader = "HTTP/2 405 Method Not Allowed\r\n";
                 }
-            }
-            else // If user tries to use anything but GET
-            {
-                responseHeader = "HTTP/2 405 Method Not Allowed\r\n";
-            }
 
-            if (responseHeader == null) 
-            {
-                responseHeader = "HTTP/2 500 Internal Server Error\r\n";
-            }
+                if (responseHeader == null)
+                {
+                    responseHeader = "HTTP/2 500 Internal Server Error\r\n";
+                }
 
-            // Sends the response header to the client
-            byte[] rhBytes = System.Text.Encoding.ASCII.GetBytes(responseHeader);
+                if (responseHeader.Contains("200 OK"))
+                {
+                    Logger.Log($"Sending successful response with header: {responseHeader}", "Response");
+                }
+                else
+                {
+                    Logger.Log($"Sending failed response with HTTP Response Code: {responseHeader.Replace("HTTP/2 ", "")}", "Response");
+                }
 
-            nStream.Write(rhBytes, 0, rhBytes.Length);
+                // Sends the response header to the client
+                byte[] rhBytes = System.Text.Encoding.ASCII.GetBytes(responseHeader);
 
-            if (content != null) // If there is content send it to the client
-            {
-                nStream.Write(content, 0, content.Length);
+                nStream.Write(rhBytes, 0, rhBytes.Length);
+
+                if (content != null) // If there is content send it to the client
+                {
+                    nStream.Write(content, 0, content.Length);
+                }
             }
         }
     }

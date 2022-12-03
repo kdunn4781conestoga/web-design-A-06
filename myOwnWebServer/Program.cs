@@ -51,6 +51,8 @@ namespace myOwnWebServer
                 }
             }
 
+            Logger.Log($"Program failed to start with invalid arguments");
+
             Console.WriteLine("Required arguments:");
             Console.WriteLine("\tmyOwnWebServer -webRoot='root' -webIP='ip' -webPort='port'\n");
         }
