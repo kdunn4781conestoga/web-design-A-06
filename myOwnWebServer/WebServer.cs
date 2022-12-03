@@ -125,11 +125,7 @@ namespace myOwnWebServer
                         }
 
                         // Parses the request
-                        string response = ParseRequest(dataStr);
-
-                        byte[] bytes = System.Text.Encoding.ASCII.GetBytes(response);
-
-                        stream.Write(bytes, 0, bytes.Length);
+                        ParseRequest(stream, dataStr);
 
                         reader.Close();
                         stream.Close();
@@ -152,11 +148,88 @@ namespace myOwnWebServer
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        private string ParseRequest(string request)
+        private void ParseRequest(NetworkStream nStream, string request)
         {
-            string response = "<body><h1>Hello World!</h1></body>";
+            // Sample request
+            //
+            // GET /sample.txt HTTP/1.1
+            // HOST: localhost
 
-            return $"HTTP/2 200 OK\r\nContent-Length:{response.Length}\r\n\r\n{response}"; // temp
+            string responseHeader = null;
+            byte[] content = null;
+
+            string methodLine = request.Substring(0, request.IndexOf("\n"));
+            string[] methodSplit = methodLine.Split(' ');
+
+            // Only GET method calls are valid
+            if (methodSplit[0] == "GET")
+            {
+                string path = methodSplit[1];
+
+                string fullPath = Root + path;
+
+                // Checks if the path exists
+                if (File.Exists(fullPath))
+                {
+                    // Determine the mime type for the path
+                    string mimeType = null;
+                    string extension = Path.GetExtension(fullPath);
+                    switch (extension)
+                    {
+                        case ".txt":
+                            mimeType = "text/plain";
+                            break;
+                        case ".html":
+                            mimeType = "text/html";
+                            break;
+                        case ".jpeg":
+                        case ".jpg":
+                            mimeType = "image/jpeg";
+                            break;
+                        case ".gif":
+                            mimeType = "image/gif";
+                            break;
+                    }
+
+                    if (mimeType != null) // If mime type is supported
+                    {
+                        content = File.ReadAllBytes(fullPath);
+
+                        responseHeader = $"HTTP/2 200 OK\r\n" +
+                                                $"HOST: localhost\r\n" +
+                                                $"Date: {DateTime.Now}\r\n" +
+                                                $"Content-Type: {mimeType}\r\n" +
+                                                $"Content-Length: {content.Length}\r\n\r\n";
+                    }
+                    else // If mime type isn't supported
+                    {
+                        responseHeader = "HTTP/2 415 Unsupported Media Type\r\n";
+                    }
+                }
+                else // If the path doesn't exist
+                {
+                    responseHeader = "HTTP/2 404 Not Found\r\n";
+                }
+            }
+            else // If user tries to use anything but GET
+            {
+                responseHeader = "HTTP/2 405 Method Not Allowed\r\n";
+            }
+
+            if (responseHeader == null) 
+            {
+                responseHeader = "HTTP/2 500 Internal Server Error\r\n";
+            }
+
+            // Sends the response header to the client
+            byte[] rhBytes = System.Text.Encoding.ASCII.GetBytes(responseHeader);
+
+            nStream.Write(rhBytes, 0, rhBytes.Length);
+
+            if (content != null) // If there is content send it to the client
+            {
+                nStream.Write(content, 0, content.Length);
+            }
         }
     }
 }
