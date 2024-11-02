@@ -6,14 +6,6 @@
 */
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
-using System.Net;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.IO;
 
 namespace myOwnWebServer
 {
@@ -32,11 +24,10 @@ namespace myOwnWebServer
                 string port = args[2].Replace("-webPort=", "");
 
                 // Checks if all of the arguments are valid
-                if (!string.IsNullOrEmpty(root)
-                    && !string.IsNullOrEmpty(address) 
-                    && !string.IsNullOrEmpty(port)
-                    && int.TryParse(port, out int portNum))
+                if (Utils.IsConnectionValid(root, address, port))
                 {
+                    int.TryParse(port, out int portNum);
+
                     // Starts the web server
                     WebServer webServer = new WebServer(root, address, portNum);
                     webServer.StartListener();

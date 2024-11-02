@@ -42,7 +42,7 @@ namespace myOwnWebServer
                         formattedMsg += $"[{action}] ";
                     }
 
-                    formattedMsg += Regex.Replace(message, "[\\r\\n]+", "\\s");
+                    formattedMsg += Regex.Replace(message, "[\\r\\n]+", " ");
 
                     writer.WriteLine(formattedMsg);
                 }
